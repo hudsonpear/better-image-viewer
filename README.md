@@ -4,7 +4,7 @@
 
 # <p align="center">Better Image Viewer</p>
 
-<p align="center"> A fast, modern, native image viewer built with Tauri. </p>
+<p align="center"> A fast, modern, image viewer built with Tauri. </p>
 
 <p align="center">  <b>Supported Formats:</b> jpg, jpeg, png, bmp, gif, webp, ico, svg, avif, cur, tiff, tif, jfif </p>
 
@@ -58,3 +58,4 @@ then run with:
 
 ```
 npm run tauri dev
+
