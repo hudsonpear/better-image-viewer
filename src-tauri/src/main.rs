@@ -200,6 +200,50 @@ fn resolve_app_path(exe: &str) -> Option<String> {
     None
 }
 
+#[cfg(target_os = "linux")]
+fn resolve_app_path(exe: &str) -> Option<String> {
+    use std::process::Command;
+    
+    // Check if it's already an absolute path that exists
+    let path = std::path::Path::new(exe);
+    if path.is_absolute() && path.exists() {
+        return Some(exe.to_string());
+    }
+    
+    // Use `which` to find the executable in PATH
+    let output = Command::new("which")
+        .arg(exe)
+        .output()
+        .ok()?;
+    
+    if output.status.success() {
+        let path_str = String::from_utf8_lossy(&output.stdout)
+            .trim()
+            .to_string();
+        if !path_str.is_empty() {
+            return Some(path_str);
+        }
+    }
+    
+    // Check common Linux application directories
+    let common_paths = [
+        "/usr/bin",
+        "/usr/local/bin",
+        "/opt",
+        "/snap/bin",
+        "/var/lib/flatpak/exports/bin",
+    ];
+    
+    for dir in common_paths {
+        let full_path = format!("{}/{}", dir, exe);
+        if std::path::Path::new(&full_path).exists() {
+            return Some(full_path);
+        }
+    }
+    
+    None
+}
+
 #[cfg(target_os = "windows")]
 fn exe_friendly_name(exe_path: &str) -> Option<String> {
     use std::path::Path;
@@ -306,6 +350,31 @@ fn exe_friendly_name(exe_path: &str) -> Option<String> {
             .and_then(|s| s.to_str())
             .map(|s| s.to_string())
     }
+}
+
+#[cfg(target_os = "linux")]
+fn exe_friendly_name(exe_path: &str) -> Option<String> {
+    use std::path::Path;
+    
+    // For Linux, just return the file stem (filename without extension)
+    Path::new(exe_path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .map(|s| {
+            // Capitalize first letter for display
+            let mut chars = s.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+            }
+        })
+}
+
+#[cfg(target_os = "linux")]
+fn extract_icon_fast(_exe_path: &str) -> Option<Vec<u8>> {
+    // Icon extraction is not implemented for Linux
+    // This would require reading .desktop files and icon themes
+    None
 }
 
 #[tauri::command]
@@ -437,6 +506,21 @@ fn open_with(path: String) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(target_os = "linux")]
+#[tauri::command]
+fn open_with(path: String) -> Result<(), String> {
+    use std::process::Command;
+
+    // On Linux, use xdg-open which opens with the default application
+    // or shows an application chooser if configured
+    Command::new("xdg-open")
+        .arg(&path)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
 #[tauri::command]
 fn open_with_app(app: String, path: String) -> Result<(), String> {
     use std::process::Command;
@@ -506,10 +590,26 @@ fn open_url(url: String) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(target_os = "windows")]
 #[tauri::command]
 fn open_with_dialog(path: String) -> Result<(), String> {
     std::process::Command::new("rundll32.exe")
         .args(["shell32.dll,OpenAs_RunDLL", &path])
+        .spawn()
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+#[tauri::command]
+fn open_with_dialog(path: String) -> Result<(), String> {
+    use std::process::Command;
+
+    // Try to open with a file manager that supports "Open With" dialogs
+    // First try xdg-open, which may show an app chooser on some desktop environments
+    Command::new("xdg-open")
+        .arg(&path)
         .spawn()
         .map_err(|e| e.to_string())?;
 
@@ -645,6 +745,31 @@ fn open_native_print_dialog(path: String) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(target_os = "linux")]
+#[tauri::command]
+fn open_native_print_dialog(path: String) -> Result<(), String> {
+    use std::process::Command;
+
+    // On Linux, we can use lp (CUPS) or xdg-open with a print scheme
+    // lp is the standard printing command on Linux
+    let result = Command::new("lp")
+        .arg(&path)
+        .spawn();
+
+    match result {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            // Fallback: try to open with the default image viewer
+            // which usually has a print option
+            Command::new("xdg-open")
+                .arg(&path)
+                .spawn()
+                .map_err(|e| format!("Failed to open print dialog: {}", e))?;
+            Ok(())
+        }
+    }
+}
+
 #[tauri::command]
 async fn trash_file(path: String) -> Result<(), String> {
     let path = Path::new(&path);
@@ -664,11 +789,48 @@ fn set_desktop_background(path: String) {
   wallpaper::set_from_path(&path).ok();
 }
 
+#[cfg(target_os = "windows")]
 #[tauri::command]
 fn open_in_explorer(path: String) {
-  let _ = std::process::Command::new("explorer")
-    .args(["/select,", &path])
-    .spawn();
+    let _ = std::process::Command::new("explorer")
+        .args(["/select,", &path])
+        .spawn();
+}
+
+#[cfg(target_os = "linux")]
+#[tauri::command]
+fn open_in_explorer(path: String) {
+    use std::path::Path;
+    use std::process::Command;
+
+    // Get the parent directory of the file
+    let parent = Path::new(&path)
+        .parent()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|| path.clone());
+
+    // Try different file managers in order of preference
+    // First try to select the file if the file manager supports it
+    let file_managers = [
+        ("nautilus", vec!["--select", &path]),      // GNOME Files
+        ("dolphin", vec!["--select", &path]),       // KDE Dolphin
+        ("nemo", vec![&path]),                       // Cinnamon Nemo
+        ("thunar", vec![&parent]),                   // XFCE Thunar
+        ("pcmanfm", vec![&parent]),                  // LXDE PCManFM
+        ("xdg-open", vec![&parent]),                 // Fallback to xdg-open
+    ];
+
+    for (cmd, args) in file_managers {
+        if Command::new("which")
+            .arg(cmd)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+        {
+            let _ = Command::new(cmd).args(&args).spawn();
+            return;
+        }
+    }
 }
 
 /* #[tauri::command]
@@ -910,4 +1072,67 @@ fn show_file_properties(path: String) -> Result<(), String> {
     }
     
     Ok(())
+}
+
+#[cfg(target_os = "linux")]
+#[tauri::command]
+fn show_file_properties(path: String) -> Result<(), String> {
+    use std::process::Command;
+
+    // Try different file managers to show properties
+    // Most file managers support a properties dialog via D-Bus or command line
+    
+    // Try nautilus (GNOME Files) with properties action
+    if Command::new("which")
+        .arg("nautilus")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+    {
+        // nautilus doesn't have a direct properties flag, open the parent and let user right-click
+        let _parent = std::path::Path::new(&path)
+            .parent()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| path.clone());
+        
+        Command::new("nautilus")
+            .arg("--select")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+    
+    // Try dolphin (KDE) with properties
+    if Command::new("which")
+        .arg("dolphin")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+    {
+        Command::new("dolphin")
+            .arg("--select")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+    
+    // Fallback: use gio info to display file information
+    // This doesn't show a dialog but returns file info
+    if Command::new("which")
+        .arg("gio")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+    {
+        // Just open the file manager with selection as fallback
+        Command::new("xdg-open")
+            .arg(std::path::Path::new(&path).parent().unwrap_or(std::path::Path::new(&path)))
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+    
+    Err("No supported file manager found to show properties".to_string())
 }

@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Rust/Cargo build artifacts
+src-tauri/target/
+
+# Generated files
+src-tauri/gen/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+build/
