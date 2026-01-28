@@ -30,7 +30,7 @@ fn get_folder_images(current_path: String) -> (Vec<String>, usize) {
     let path = Path::new(&current_path);
     let dir = path.parent().unwrap();
 
-    let mut images: Vec<String> = fs::read_dir(dir)
+    let images: Vec<String> = fs::read_dir(dir)
         .unwrap()
         .filter_map(|e| e.ok())
         .map(|e| e.path())
