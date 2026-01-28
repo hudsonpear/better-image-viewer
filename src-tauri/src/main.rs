@@ -1090,7 +1090,7 @@ fn show_file_properties(path: String) -> Result<(), String> {
         .unwrap_or(false)
     {
         // nautilus doesn't have a direct properties flag, open the parent and let user right-click
-        let parent = std::path::Path::new(&path)
+        let _parent = std::path::Path::new(&path)
             .parent()
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_else(|| path.clone());
