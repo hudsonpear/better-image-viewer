@@ -110,11 +110,25 @@
   gap: 20px;
   z-index: 1000;
 }
+/* The side slots take equal space and the middle one is sized by its content,
+   so the File/Print/Open With group stays centred in the window no matter how
+   many panel buttons appear on the left. */
 .startTopBar {
   zoom: 80%;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
 }
 .endTopBar {
   zoom: 80%;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 #insideTopBar {
   display: flex;
@@ -123,6 +137,8 @@
   gap: 20px;
   z-index: 1000;
   zoom: 80%;
+  /* sized by its own content, never stretched or squeezed by the side slots */
+  flex: 0 0 auto;
 }
 #aboutBtn {
   position: relative;
@@ -396,6 +412,25 @@
 
 .ctx-item {
   padding: 8px 12px;
+}
+
+/* file menu rows: icon + label on one line */
+#fileMenuContextMenu .ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ctxIcon {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  fill: currentColor;
+  opacity: 0.75;
+}
+
+.ctx-item:hover .ctxIcon {
+  opacity: 1;
 }
 
 /* loading */
@@ -837,18 +872,6 @@
   background: #1a1a1a;
 } */
  
-#gridView {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  /* height: 100%; */
-  /* background: #1a1a1a; */
-  overflow-y: auto;
-  z-index: 20;
-}
-
-
 #gridContainer {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -858,6 +881,7 @@
 
 /* fixed-height wrapper so items stay proportional */
 .thumbWrapper {
+  position: relative;     /* anchors the format badge */
   width: 100%;
   height: 140px;          /* fixed height you want */
   /* background: #000; */
@@ -868,6 +892,60 @@
   overflow: hidden;
   border-radius: 6px;
   cursor: pointer;
+}
+
+/* a bar button that can't act on this file: still visible, clearly inert.
+   It keeps its click handler so it can explain why. */
+.menu.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.menu.disabled:hover {
+  background: none;
+}
+
+/* message card, top-right of the viewer area (below the topbar) */
+#appToast {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  transform: translateY(-6px);
+  max-width: min(420px, 60%);
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  border-left: 3px solid #ff6b6b;
+  background: rgba(28, 28, 28, 0.96);
+  color: #eaeaea;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: left;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 10000;
+}
+
+#appToast.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.thumbFormat {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #eaeaea;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.4px;
+  line-height: 1.5;
+  pointer-events: none;   /* the whole tile stays clickable */
 }
 
 /* real image */
@@ -885,16 +963,12 @@
 }
 
 #gridView {
-  z-index: 99999 !important;
-  pointer-events: auto;
-}
-
-#gridView {
   position: absolute;
   inset: 0;              /* top:0 left:0 right:0 bottom:0 */
   background: #1a1a1a;
   overflow-y: auto;
-  z-index: 9999;
+  z-index: 5;
+  pointer-events: auto;
 }
 
 /* IMAGE INFO WINDOW */
@@ -922,6 +996,7 @@
 }
 
 .windowTop2 {
+  /* cursor: move; */
   position: absolute;
   height: 28px;
   display: flex;
@@ -1163,3 +1238,632 @@
     width: 50px;
     margin: 5px;
 }
+
+/* QR CODE DIALOG */
+
+#qrDlg {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(560px, 90vw);
+  max-height: 80vh;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 2px 5px var(--box-shadow-color);
+  border-radius: 9px;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 9999;
+  display: none;
+}
+
+.qrContent {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.qrCount {
+  opacity: 0.7;
+}
+
+.qrRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--content-div-color);
+}
+
+.qrText {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 13px;
+}
+
+.qrLink {
+  color: #6db3ff;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.qrLink:hover {
+  color: #9fccff;
+}
+
+.qrCopy {
+  flex: 0 0 auto;
+  padding: 4px 8px !important;
+  font-size: 12px;
+  font-weight: normal;
+}
+
+/* OCR DIALOG — same shell as the QR one */
+
+#ocrDlg {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(640px, 92vw);
+  height: min(560px, 80vh);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 2px 5px var(--box-shadow-color);
+  border-radius: 9px;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 9999;
+  display: none;
+}
+
+.ocrContent {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+}
+
+.ocrText {
+  flex: 1 1 auto;
+  min-height: 0;
+  resize: none;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--background-colorInput);
+  color: var(--text-color);
+  font-size: 14px;
+  line-height: 1.5;
+  user-select: text;
+}
+
+#ocrCopyAll,
+#ocrCloseBtn {
+  width: 130px;
+}
+
+.qrDlgBtns {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px;
+}
+
+#qrCloseBtn {
+  width: 100px;
+}
+
+#svgPanelBtn.active,
+#imgPanelBtn.active,
+#convertPanelBtn.active,
+#compressPanelBtn.active {
+  background: var(--background-colorInput);
+}
+
+/* COMPRESS PANEL — same shell as the other side panels */
+
+#compressPanel {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 300px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  background: var(--content-div-color);
+  border-right: 1px solid var(--border-color);
+  box-shadow: 2px 0 8px var(--box-shadow-color);
+  color: var(--text-color);
+  font-size: 13px;
+}
+
+#compressPanelTop {
+  position: relative;
+  flex: 0 0 auto;
+  padding: 8px 40px 8px 12px;
+  font-weight: bold;
+  border-bottom: 1px solid var(--border-color);
+}
+
+#compressPanelTop .closeBtn {
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#compressPanelBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px;
+}
+
+.compressSize {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 5px;
+  background: var(--background-colorInput);
+  font-variant-numeric: tabular-nums;
+}
+
+.compressSize b {
+  font-weight: bold;
+}
+
+.compressDims {
+  margin-top: -8px;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.compressSaving {
+  color: #6fd18a;
+}
+
+.compressGrow {
+  color: #ffc46b;
+}
+
+/* CONVERTER PANEL — same shell as the other side panels */
+
+#convertPanel {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 300px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  background: var(--content-div-color);
+  border-right: 1px solid var(--border-color);
+  box-shadow: 2px 0 8px var(--box-shadow-color);
+  color: var(--text-color);
+  font-size: 13px;
+}
+
+#convertPanelTop {
+  position: relative;
+  flex: 0 0 auto;
+  padding: 8px 40px 8px 12px;
+  font-weight: bold;
+  border-bottom: 1px solid var(--border-color);
+}
+
+#convertPanelTop .closeBtn {
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#convertPanelBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px;
+}
+
+.convertFormats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.convertFormat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 7px 9px !important;
+  font-size: 13px;
+  font-weight: normal;
+  text-align: left;
+  /* dimmer than the shared --border-color so the selected one stands out */
+  border-color: #4a4a4a;
+}
+
+.convertFormat small {
+  opacity: 0.6;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+/* Selected format. The old style only nudged the background by 8/255 and set a
+   white border next to an already near-white default, so it read as unselected. */
+#convertPanelBody .convertFormat.active {
+  border-color: #4a9eff;
+  box-shadow: inset 0 0 0 1px #4a9eff;
+  background: rgba(74, 158, 255, 0.18);
+}
+
+#convertPanelBody .convertFormat.active span {
+  font-weight: bold;
+}
+
+#convertPanelBody .convertFormat.active small {
+  opacity: 0.9;
+}
+
+.convertWarn {
+  color: #ffc46b;
+}
+
+/* IMAGE CONTROLS PANEL — shares the SVG panel's shell */
+
+#imgPanel {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 320px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  background: var(--content-div-color);
+  border-right: 1px solid var(--border-color);
+  box-shadow: 2px 0 8px var(--box-shadow-color);
+  color: var(--text-color);
+  font-size: 13px;
+}
+
+
+#imgPanelTop {
+  position: relative;
+  flex: 0 0 auto;
+  padding: 8px 40px 8px 12px;
+  font-weight: bold;
+  border-bottom: 1px solid var(--border-color);
+}
+
+#imgPanelTop .closeBtn {
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#imgPanelBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px;
+}
+
+.imgNote {
+  padding: 6px 8px;
+  border-radius: 5px;
+  background: var(--background-colorInput);
+  opacity: 0.85;
+  line-height: 1.4;
+}
+
+.imgSliderRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.imgSliderRow label {
+  flex: 0 0 84px;
+}
+
+.imgSliderRow input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.imgSliderValue {
+  flex: 0 0 42px;
+  text-align: right;
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+
+.imgToggleGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.imgBtn {
+  padding: 6px 8px !important;
+  font-size: 13px;
+  font-weight: normal;
+  white-space: nowrap;
+}
+
+.imgBtn:hover {
+  background: var(--background-colorInput);
+}
+
+.imgBtn.active {
+  border-color: #4a9eff;
+  box-shadow: inset 0 0 0 1px #4a9eff;
+  background: rgba(74, 158, 255, 0.18);
+}
+
+#imgPanelBody .svgSectionTitle {
+  margin-top: 2px;
+}
+
+.imgActions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 10px;
+}
+
+.imgStatus {
+  min-height: 16px;
+  opacity: 0.8;
+}
+
+.imgStatus.error {
+  color: #ff8080;
+  opacity: 1;
+}
+
+.imgBusy {
+  opacity: 0.6;
+}
+
+/* SVG CONTROL PANEL */
+
+#svgPanel {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 320px;
+  z-index: 4; /* below #gridView (5), so grid mode covers it */
+  display: flex;
+  flex-direction: column;
+  background: var(--content-div-color);
+  border-right: 1px solid var(--border-color);
+  box-shadow: 2px 0 8px var(--box-shadow-color);
+  color: var(--text-color);
+  font-size: 13px;
+}
+
+#svgPanelTop {
+  position: relative;
+  flex: 0 0 auto;
+  padding: 8px 40px 8px 12px;
+  font-weight: bold;
+  border-bottom: 1px solid var(--border-color);
+}
+
+#svgPanelTop .closeBtn {
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#svgPanelBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px;
+}
+
+.svgSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.svgCodeSection {
+  flex: 1 1 auto;
+  min-height: 160px;
+}
+
+.svgSectionTitle {
+  font-weight: bold;
+  opacity: 0.8;
+}
+
+.svgRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.svgBtn {
+  padding: 6px 8px !important;
+  font-size: 13px;
+  font-weight: normal;
+  flex: 1 1 auto;
+  white-space: nowrap;
+}
+
+.svgBtn:hover {
+  background: var(--background-colorInput);
+}
+
+.svgBtn.active {
+  border-color: #4a9eff;
+  box-shadow: inset 0 0 0 1px #4a9eff;
+  background: rgba(74, 158, 255, 0.18);
+}
+
+.svgWideBtn {
+  width: 100%;
+}
+
+.svgValue {
+  min-width: 44px;
+  text-align: right;
+}
+
+#svgRotSlider {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#svgCode {
+  flex: 1 1 auto;
+  min-height: 140px;
+  resize: vertical;
+  padding: 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border-color);
+  background: var(--background-colorInput);
+  color: var(--text-color);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre;
+  overflow: auto;
+}
+
+.svgStatus {
+  min-height: 16px;
+  opacity: 0.8;
+}
+
+.svgStatus.error {
+  color: #ff8080;
+  opacity: 1;
+}
+
+.svgNumber {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 5px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--background-colorInput);
+  color: var(--text-color);
+  font-size: 13px;
+}
+
+.svgFieldLabel {
+  flex: 0 0 auto;
+  opacity: 0.8;
+}
+
+.svgCheck {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#svgColorList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.svgColorRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.svgColorRow span {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.svgColorRow .svgColorCount {
+  margin-left: auto;
+  opacity: 0.6;
+  flex: 0 0 auto;
+}
+
+#svgPanel input[type="color"] {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--background-colorInput);
+  cursor: pointer;
+}
+
+#svgPanel input[type="color"]:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.svgEmptyNote {
+  opacity: 0.6;
+}
+
